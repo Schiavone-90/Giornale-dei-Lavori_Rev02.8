@@ -108,6 +108,7 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [view, setView] = useState("login");
   const [loading, setLoading] = useState(false);
+  const [initLoaded, setInitLoaded] = useState(false);
 
   // Supabase state
   const [impostazioni, setImpostazioni] = useState({ dlPassword:"Dl01", firmaDL_img:"", firmeDitte:{} });
@@ -129,8 +130,9 @@ export default function App() {
 
   const db = { ditte, cantieri, anagraficaOperai:operaiAna, anagraficaMezzi:mezziAna, giornali, firmaDL_img:impostazioni.firmaDL_img, firmeDitte:impostazioni.firmeDitte||{}, dlPassword:impostazioni.dlPassword };
 
-  const loadAll = useCallback(async () => {
-    setLoading(true);
+  const loadAll = useCallback(async (isInit=false) => {
+    if (isInit) setInitLoaded(false);
+    else setLoading(true);
     const [imp, dit, can, ops, mzz, gio] = await Promise.all([
       sbGet("impostazioni"), sbGet("imprese"), sbGet("cantieri"),
       sbGet("operai_ana"), sbGet("mezzi_ana"), sbGet("giornali")
@@ -142,9 +144,13 @@ export default function App() {
     setOperaiAna(ops.map(x=>({id:x.id,...x.data})));
     setMezziAna(mzz.map(x=>({id:x.id,...x.data})));
     setGiornali(gio.map(x=>({id:x.id,cantiereId:x.cantiere_id,...x.data})));
-    setLoading(false);
+    if (isInit) setInitLoaded(true);
+    else setLoading(false);
   }, []);
 
+  // Carica impostazioni e ditte PRIMA del login
+  useEffect(() => { loadAll(true); }, [loadAll]);
+  // Ricarica tutto dopo il login
   useEffect(() => { if (session) loadAll(); }, [session, loadAll]);
 
   const saveImp = async (patch) => {
@@ -173,7 +179,7 @@ export default function App() {
   const visibleCantieri = isDL ? cantieri : cantieri.filter(c=>(curDitta?.cantieriIds||[]).includes(c.id));
 
   /* ── routing ── */
-  if (view==="login") return <Login impostazioni={impostazioni} ditte={ditte} onLogin={s=>{setSession(s);nav("cantieri");}}/>;
+  if (view==="login") return <Login impostazioni={impostazioni} ditte={ditte} initLoaded={initLoaded} onLogin={s=>{setSession(s);nav("cantieri");}}/>;
 
   if (view==="impostazioni") return <Impostazioni
     db={db} saveImp={saveImp} saveDitta={saveDitta} delDitta={delDitta}
@@ -328,9 +334,10 @@ function GiornaleCard({ g, label, onClick }) {
 }
 
 /* ─── LOGIN ─────────────────────────────────── */
-function Login({ impostazioni, ditte, onLogin }) {
+function Login({ impostazioni, ditte, initLoaded, onLogin }) {
   const [pwd,setPwd]=useState(""); const [err,setErr]=useState("");
   const go=()=>{
+    if(!initLoaded) return;
     if(!pwd.trim()) return setErr("Inserisci la password.");
     if(pwd===impostazioni.dlPassword){onLogin({role:"dl"});return;}
     const d=ditte.find(x=>x.password===pwd);
@@ -345,11 +352,15 @@ function Login({ impostazioni, ditte, onLogin }) {
           <div style={{fontSize:20,fontWeight:700,color:C.txt}}>Giornale dei Lavori</div>
           <div style={{fontSize:13,color:C.txt2,marginTop:6}}>Inserisci la tua password per accedere</div>
         </div>
-        <Fld label="Password">
-          <input type="password" value={pwd} onChange={e=>{setPwd(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&go()} style={iF} placeholder="••••••••" autoFocus/>
-        </Fld>
-        {err&&<div style={{fontSize:12,color:C.danger,marginBottom:10,padding:"8px 12px",background:"#FEF2F2",borderRadius:"var(--border-radius-md)"}}>{err}</div>}
-        <Btn full onClick={go} style={{marginTop:4}}>Accedi</Btn>
+        {!initLoaded
+          ? <div style={{textAlign:"center",padding:"16px 0",color:C.txt3,fontSize:13}}>⏳ Connessione in corso...</div>
+          : <>
+              <Fld label="Password">
+                <input type="password" value={pwd} onChange={e=>{setPwd(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&go()} style={iF} placeholder="••••••••" autoFocus/>
+              </Fld>
+              {err&&<div style={{fontSize:12,color:C.danger,marginBottom:10,padding:"8px 12px",background:"#FEF2F2",borderRadius:"var(--border-radius-md)"}}>{err}</div>}
+              <Btn full onClick={go} style={{marginTop:4}}>Accedi</Btn>
+            </>}
       </div>
     </div>
   );
