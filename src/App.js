@@ -133,25 +133,32 @@ export default function App() {
   const loadAll = useCallback(async (isInit=false) => {
     if (isInit) setInitLoaded(false);
     else setLoading(true);
-    const [imp, dit, can, ops, mzz, gio] = await Promise.all([
-      sbGet("impostazioni"), sbGet("imprese"), sbGet("cantieri"),
-      sbGet("operai_ana"), sbGet("mezzi_ana"), sbGet("giornali")
-    ]);
-    const impData = imp.find(x=>x.id==="global");
-    if (impData) setImpostazioni(impData.data);
-    setDitte(dit.map(x=>({id:x.id,...x.data})));
-    setCantieri(can.map(x=>({id:x.id,...x.data})));
-    setOperaiAna(ops.map(x=>({id:x.id,...x.data})));
-    setMezziAna(mzz.map(x=>({id:x.id,...x.data})));
-    setGiornali(gio.map(x=>({id:x.id,cantiereId:x.cantiere_id,...x.data})));
-    if (isInit) setInitLoaded(true);
-    else setLoading(false);
+    try {
+      const [imp, dit, can, ops, mzz, gio] = await Promise.all([
+        sbGet("impostazioni"), sbGet("imprese"), sbGet("cantieri"),
+        sbGet("operai_ana"), sbGet("mezzi_ana"), sbGet("giornali")
+      ]);
+      const impData = imp.find(x=>x.id==="global");
+      if (impData) setImpostazioni(impData.data);
+      setDitte(dit.map(x=>({id:x.id,...x.data})));
+      setCantieri(can.map(x=>({id:x.id,...x.data})));
+      setOperaiAna(ops.map(x=>({id:x.id,...x.data})));
+      setMezziAna(mzz.map(x=>({id:x.id,...x.data})));
+      setGiornali(gio.map(x=>({id:x.id,cantiereId:x.cantiere_id,...x.data})));
+    } catch(e) {
+      console.error("Errore caricamento:", e);
+    } finally {
+      if (isInit) setInitLoaded(true);
+      else setLoading(false);
+    }
   }, []);
 
-  // Carica impostazioni e ditte PRIMA del login
+  // Carica SEMPRE dati freschi da Supabase all'avvio e quando si torna al login
   useEffect(() => { loadAll(true); }, [loadAll]);
   // Ricarica tutto dopo il login
   useEffect(() => { if (session) loadAll(); }, [session, loadAll]);
+  // Ricarica dati freschi ogni volta che si va al login (dopo logout)
+  useEffect(() => { if (view === "login") loadAll(true); }, [view]);
 
   const saveImp = async (patch) => {
     const n = {...impostazioni,...patch};
@@ -179,8 +186,7 @@ export default function App() {
   const visibleCantieri = isDL ? cantieri : cantieri.filter(c=>(curDitta?.cantieriIds||[]).includes(c.id));
 
   /* ── routing ── */
-  if (view==="login") return <Login impostazioni={impostazioni} ditte={ditte} initLoaded={initLoaded} onLogin={s=>{setSession(s);nav("cantieri");}}/>;
-
+  if (view==="login") return <Login impostazioni={impostazioni} ditte={ditte} initLoaded={initLoaded} onLogin={s=>{setSession(s);nav("cantieri");}} onRetry={()=>loadAll(true)}/>;
   if (view==="impostazioni") return <Impostazioni
     db={db} saveImp={saveImp} saveDitta={saveDitta} delDitta={delDitta}
     onBack={()=>nav("cantieri")} isDL={isDL} role={roleLabel} onLogout={logout}/>;
@@ -334,7 +340,7 @@ function GiornaleCard({ g, label, onClick }) {
 }
 
 /* ─── LOGIN ─────────────────────────────────── */
-function Login({ impostazioni, ditte, initLoaded, onLogin }) {
+function Login({ impostazioni, ditte, initLoaded, onLogin, onRetry }) {
   const [pwd,setPwd]=useState(""); const [err,setErr]=useState("");
   const go=()=>{
     if(!initLoaded) return;
@@ -353,13 +359,17 @@ function Login({ impostazioni, ditte, initLoaded, onLogin }) {
           <div style={{fontSize:13,color:C.txt2,marginTop:6}}>Inserisci la tua password per accedere</div>
         </div>
         {!initLoaded
-          ? <div style={{textAlign:"center",padding:"16px 0",color:C.txt3,fontSize:13}}>⏳ Connessione in corso...</div>
+          ? <div style={{textAlign:"center",padding:"16px 0"}}>
+              <div style={{color:C.txt3,fontSize:13,marginBottom:12}}>⏳ Connessione in corso...</div>
+              <div style={{fontSize:12,color:C.txt3}}>Attendi, caricamento dati da Supabase</div>
+            </div>
           : <>
               <Fld label="Password">
                 <input type="password" value={pwd} onChange={e=>{setPwd(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&go()} style={iF} placeholder="••••••••" autoFocus/>
               </Fld>
               {err&&<div style={{fontSize:12,color:C.danger,marginBottom:10,padding:"8px 12px",background:"#FEF2F2",borderRadius:"var(--border-radius-md)"}}>{err}</div>}
               <Btn full onClick={go} style={{marginTop:4}}>Accedi</Btn>
+              <button onClick={onRetry} style={{width:"100%",marginTop:10,background:"none",border:"none",cursor:"pointer",fontSize:12,color:C.txt3}}>🔄 Ricarica dati</button>
             </>}
       </div>
     </div>
