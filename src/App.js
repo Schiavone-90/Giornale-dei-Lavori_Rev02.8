@@ -18,7 +18,7 @@ async function sbDelete(table,id) {
 /* ─── COSTANTI ─────────────────────────────── */
 const genId = () => Math.random().toString(36).slice(2,10);
 const todayStr = () => new Date().toISOString().slice(0,10);
-const QUALIFICHE = ["Operaio comune","Operaio specializzato","Caposquadra","Gruista","Carpentiere","Ferraiolo","Muratore","Elettricista","Idraulico","Topografo"];
+const QUALIFICHE = ["Operaio comune","Operaio qualificato - 1","Operaio qualificato - 2","Operaio qualificato - 3","Operaio qualificato - 4","Ferraiolo","Muratore","Elettricista","Idraulico","Topografo"];
 const TIPI_MEZZO = ["Escavatore","Gru","Camion","Bobcat/Minipala","Autocarro","Dumper","Betoniera","Pompa calcestruzzo","Compressore","Rullo compattatore","Piattaforma aerea","Carrello elevatore","Trattore","Motopompa","Altro"];
 const VISITATORI = ["DL","RUP","Collaudatore","CSE","Ispettorato del Lavoro","Tecnici Enti Erogatori","Altro"];
 const ESITI = ["Positivo","Positivo con riserve","Negativo/Sospensione"];
